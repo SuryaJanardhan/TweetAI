@@ -8,8 +8,104 @@ This plan turns the current Tweet-AI backend scaffold into a reliable production
 - Agent orchestration loop using observe, think, plan, act, reflect, learn phases.
 - Safety guardian that blocks actions above 80% of configured Twitter/X limits.
 - File-backed memory store and structured file logger.
-- Basic role middleware using `x-role`.
-- Focused tests for orchestration and safety behavior.
+- API-key authentication using `Authorization: Bearer <token>`.
+- Role-based authorization for write/action endpoints.
+- Validated runtime config with production fail-fast behavior.
+- Request IDs, consistent error envelopes, body validation, and memory-type validation.
+- Async orchestration jobs with status tracking and idempotency-key reuse.
+- Liveness and dependency-aware readiness endpoints.
+- Focused tests for config, auth, validation, job idempotency, orchestration, and safety behavior.
+
+## Newly Added Robustness Requirements
+
+The recent implementation improved the app flow, but these additions must be hardened before live production use.
+
+### A. Async Job Flow
+
+Implemented now:
+
+- `/orchestrate` queues orchestration work instead of running it synchronously.
+- `GET /jobs/:id` exposes job state.
+- `Idempotency-Key` prevents duplicate orchestration jobs.
+- `JobRunner` records succeeded and failed outcomes.
+
+Must harden next:
+
+- Move job state from local JSON files to Redis/BullMQ plus durable database records.
+- Add worker concurrency limits per account and globally.
+- Add retry policy with exponential backoff and max attempts.
+- Add dead-letter queue for permanently failed jobs.
+- Add job cancellation and pause/resume controls.
+- Add stale-running job detection after process crashes.
+- Add idempotency-key scoping by account, route, and payload hash.
+- Add payload hash mismatch detection when the same idempotency key is reused with different input.
+- Add job retention policy and archival.
+
+Acceptance criteria:
+
+- A process crash cannot leave jobs permanently invisible or duplicated.
+- A retry cannot create duplicate external Twitter/X actions.
+- Operators can inspect, retry, cancel, and explain every job.
+- Multi-instance workers cannot execute the same job twice.
+
+### B. Readiness and Health
+
+Implemented now:
+
+- `/system-health` is a lightweight liveness endpoint.
+- `/system-readiness` checks memory and job storage.
+
+Must harden next:
+
+- Add readiness checks for Redis, database, Twitter/X client credentials, queue worker availability, and model provider connectivity.
+- Add degraded states for optional dependencies.
+- Add startup dependency checks before accepting traffic.
+- Add shutdown hooks that stop accepting new jobs before closing workers.
+
+Acceptance criteria:
+
+- The app does not receive production traffic when required dependencies are down.
+- Deployments fail before serving unsafe or partially initialized behavior.
+
+### C. Auth and Audit
+
+Implemented now:
+
+- Bearer API-key auth replaces trusted role headers.
+- Viewer/editor/admin roles protect write and orchestration endpoints.
+
+Must harden next:
+
+- Store API keys hashed, not as plaintext environment strings.
+- Add key IDs and rotation support.
+- Add per-key rate limits.
+- Add audit records in durable storage for every write, job creation, job completion, safety decision, and external action.
+- Add account/workspace scoping to every request and every idempotency key.
+
+Acceptance criteria:
+
+- A leaked key can be revoked without redeploying the service.
+- Every high-risk operation answers who, what, when, where, why, and result.
+
+### D. Validation and Agent Contracts
+
+Implemented now:
+
+- Request body and memory type validation.
+- Agent output contract checks inside the orchestrator.
+
+Must harden next:
+
+- Add explicit schemas for every route request and response.
+- Add strict schemas for every agent phase input and output.
+- Add max field lengths and allowed enum values.
+- Add policy validation before planning and before acting.
+- Reject unsafe learned memory before it enters strategic or semantic stores.
+
+Acceptance criteria:
+
+- Invalid user input, invalid agent output, and invalid third-party responses fail closed.
+- No unsafe action can pass because of a malformed intermediate object.
 
 ## Production Principles
 
@@ -25,28 +121,37 @@ This plan turns the current Tweet-AI backend scaffold into a reliable production
 
 ### 1. Configuration and Secrets
 
+Status: partially implemented.
+
 Tasks:
 
-- Add a typed configuration module that reads environment variables once at startup.
-- Validate required variables with clear startup errors.
+- Keep the typed configuration module that reads environment variables once at startup.
+- Keep required variable validation with clear startup errors.
 - Separate local, test, staging, and production configuration.
-- Add `.env.example` with safe placeholder values.
-- Ensure logs never include API keys, access tokens, cookies, auth headers, or raw private prompts.
+- Keep `.env.example` with safe placeholder values.
+- Keep log redaction for API keys, access tokens, cookies, auth headers, and raw private prompts.
+- Add secret scanning in CI.
+- Add rotation playbooks for API keys and Twitter/X credentials.
 
 Acceptance criteria:
 
 - App fails fast when required production configuration is missing.
 - Tests can run with isolated test configuration.
 - No secrets appear in logs, responses, or committed files.
+- Secrets can be rotated without code changes.
 
 ### 2. Real Authentication and Authorization
 
+Status: partially implemented with Bearer API keys.
+
 Tasks:
 
-- Replace `x-role` trust with real authentication.
-- Use JWT, session auth, or API keys depending on deployment needs.
-- Add role and permission checks for all write or action endpoints.
-- Add audit logs for authenticated user, route, operation, and decision.
+- Keep Bearer API-key auth for service/API access.
+- Replace plaintext API key configuration with hashed key storage.
+- Add key IDs, expiration, rotation, and revocation.
+- Add account/workspace scoping.
+- Keep role and permission checks for all write or action endpoints.
+- Add durable audit logs for authenticated user, route, operation, and decision.
 - Rate-limit authentication failures.
 
 Acceptance criteria:
@@ -54,22 +159,28 @@ Acceptance criteria:
 - Anonymous users cannot mutate memory, trigger orchestration, or execute actions.
 - Authorization tests cover viewer, editor, admin, invalid token, and missing token cases.
 - Audit logs identify who triggered each high-risk operation.
+- Revoked credentials stop working immediately.
 
 ### 3. Request and Response Validation
 
+Status: partially implemented.
+
 Tasks:
 
-- Add schema validation for all route params, query params, and request bodies.
-- Validate agent outputs before passing them to the next orchestration phase.
-- Return consistent error envelopes.
-- Add request size limits.
-- Reject unknown memory types and unsupported action types before orchestration.
+- Keep validation for JSON object bodies, memory types, and idempotency keys.
+- Add schema validation for all route params, query params, request bodies, and responses.
+- Keep agent output validation before passing results to the next orchestration phase.
+- Keep consistent error envelopes.
+- Keep request size limits.
+- Reject unsupported action types before orchestration.
+- Add payload hashing for idempotency-key reuse.
 
 Acceptance criteria:
 
 - Invalid payloads return `400` with stable machine-readable errors.
 - Agent output contract failures are logged and stop unsafe execution.
 - Tests cover malformed bodies, invalid memory types, and invalid orchestration payloads.
+- Reused idempotency keys with different payloads are rejected.
 
 ### 4. Durable Persistence
 
@@ -111,20 +222,26 @@ Acceptance criteria:
 
 ### 6. Queue-Based Orchestration
 
+Status: locally implemented with file-backed jobs; production adapter still required.
+
 Tasks:
 
-- Split API requests from background workers.
-- Add a job queue for orchestration cycles and external actions.
-- Store job status: queued, running, succeeded, failed, canceled, delayed.
-- Add idempotency keys for action jobs.
+- Keep API request/worker separation at the route contract level.
+- Replace file-backed job storage with Redis/BullMQ or an equivalent production queue.
+- Store job status: queued, running, succeeded, failed, canceled, delayed, dead-lettered.
+- Keep idempotency keys for orchestration jobs.
+- Add idempotency keys for every external action job.
 - Add retry policies with exponential backoff and dead-letter queues.
 - Add cancellation and pause controls per account.
+- Add stale job recovery after worker crash.
+- Add queue-depth metrics and backlog alerts.
 
 Acceptance criteria:
 
 - API returns quickly with a job id for long-running work.
 - Duplicate requests do not create duplicate external actions.
 - Failed jobs are visible, retryable, and auditable.
+- Multi-instance workers cannot claim the same job simultaneously.
 
 ### 7. Twitter/X Integration
 
@@ -145,6 +262,8 @@ Acceptance criteria:
 
 ### 8. Orchestrator Hardening
 
+Status: partially implemented.
+
 Tasks:
 
 - Make each phase explicit and independently testable.
@@ -153,19 +272,24 @@ Tasks:
 - Persist intermediate phase outputs for resume and debugging.
 - Add deterministic run ids and correlation ids.
 - Add policy checks before plan and before act.
+- Keep agent output contract checks.
+- Add phase-level failure states and resume behavior.
 
 Acceptance criteria:
 
 - A failed phase does not lose the full cycle context.
 - Cycles can be inspected by run id.
 - Timeouts and partial failures produce stable, actionable error states.
+- No action phase can run unless observe, think, plan, and policy checks succeeded.
 
 ### 9. Observability
 
+Status: partially implemented.
+
 Tasks:
 
-- Replace file-only logging with structured logs to stdout in production.
-- Add request ids and correlation ids.
+- Keep structured logs to stdout in production.
+- Keep request IDs and add full correlation IDs across jobs, safety decisions, and external calls.
 - Add metrics:
   - request rate, latency, and error rate
   - orchestration success/failure counts
@@ -178,6 +302,7 @@ Tasks:
   - readiness
   - dependency checks
 - Add alerts for safety bypass attempts, high failure rate, queue backlog, and auth failures.
+- Add dashboards for job health, safety blocks, external API failures, and model costs.
 
 Acceptance criteria:
 
@@ -341,16 +466,73 @@ Acceptance criteria:
 
 ## Recommended Near-Term Implementation Order
 
-1. Add config validation and `.env.example`.
-2. Add request validation and consistent error responses.
-3. Add real auth and authorization tests.
-4. Move safety counters to Redis-backed storage.
-5. Add queue-based orchestration and idempotency.
-6. Add durable database schema for actions, audits, jobs, memory, users, and accounts.
-7. Build the Twitter/X client behind dry-run mode.
-8. Add production logging, metrics, readiness checks, and alerts.
-9. Containerize and add CI gates.
-10. Run a staged rollout with human approval before live actions.
+1. Replace file-backed jobs with Redis/BullMQ and durable job records.
+2. Add payload-hash idempotency and account-scoped idempotency keys.
+3. Move safety counters to Redis-backed rolling windows with atomic operations.
+4. Add durable database schema for actions, audits, jobs, memory, users, accounts, and API keys.
+5. Add hashed API-key storage, key IDs, revocation, and auth failure rate limits.
+6. Add action executor boundaries: dry-run, human approval, idempotency, safety pre-check, audit write, external call, reconcile.
+7. Build the Twitter/X client behind dry-run mode with retries, timeouts, and mocked contract tests.
+8. Add metrics, dashboards, readiness checks for all dependencies, and production alerts.
+9. Containerize with graceful worker shutdown and non-root runtime.
+10. Add CI gates for tests, linting, dependency audit, secret scanning, and container build.
+11. Run staging soak tests with dry-run actions.
+12. Run production rollout with human approval before live actions.
+
+## Robust++ Release Gates
+
+Do not mark the system production-ready until every gate below is true.
+
+### Functional Gates
+
+- `POST /orchestrate` never performs external actions inline.
+- Every external action is represented by a durable action record.
+- Every action has an idempotency key, safety decision, actor, account, run id, job id, and external provider response.
+- Job retries cannot duplicate tweets, likes, replies, follows, reposts, or deletes.
+- A worker crash during any phase can be recovered or safely marked failed.
+- Human approval can be required per account, campaign, action type, or risk score.
+
+### Safety Gates
+
+- Safety counters are atomic across multiple API and worker instances.
+- Emergency stop blocks all queued and future external actions.
+- Account pause blocks only the selected account.
+- Limits are enforced by action type and time window.
+- Safety decisions are logged before every external action attempt.
+- Safety test coverage includes boundary, burst, concurrency, reset, pause, and emergency-stop cases.
+
+### Reliability Gates
+
+- Required dependencies are checked at startup and readiness.
+- Queue backlog, failed jobs, and dead-letter counts are visible and alerted.
+- Database migrations are automated and reversible.
+- All outbound calls have timeouts, retries where safe, and circuit breakers.
+- Graceful shutdown drains or requeues in-flight work.
+- Backups and restore drills are tested.
+
+### Security Gates
+
+- API keys are hashed at rest and include key IDs.
+- Production credentials are not stored in `.env` files on servers.
+- Auth failures are rate-limited and alerted.
+- Logs redact secrets and private prompt material.
+- Audit logs are append-only or tamper-evident.
+- Dependency and secret scans pass in CI.
+
+### Observability Gates
+
+- Logs include request id, correlation id, job id, run id, account id, and action id where applicable.
+- Metrics include API latency, error rate, queue depth, job latency, safety blocks, external API errors, and model cost.
+- Dashboards exist for API health, workers, queues, safety, jobs, and external providers.
+- Alerts route to the responsible operator with runbook links.
+
+### Testing Gates
+
+- Unit tests cover config, auth, validation, safety, jobs, orchestrator contracts, and error mapping.
+- Integration tests cover Redis, database, queue processing, and storage adapters.
+- Contract tests cover Twitter/X client success, rate limit, auth failure, timeout, retryable errors, and non-retryable errors.
+- End-to-end dry-run tests cover the full observe-think-plan-act-reflect-learn workflow.
+- Chaos tests simulate worker crash, Redis outage, database outage, Twitter/X outage, and model provider timeout.
 
 ## Definition of Production Ready
 

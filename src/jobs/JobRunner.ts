@@ -1,19 +1,39 @@
+import type { LoggerLike } from '../types.js';
+import type { JobRecord, JobStore } from './JobStore.js';
+
+interface OrchestratorLike {
+  loop(context?: unknown): Promise<unknown>;
+}
+
+interface JobRunnerDependencies {
+  jobStore: JobStore;
+  orchestrator: OrchestratorLike;
+  logger: LoggerLike;
+}
+
 export class JobRunner {
-  constructor({ jobStore, orchestrator, logger }) {
+  jobStore: JobStore;
+  orchestrator: OrchestratorLike;
+  logger: LoggerLike;
+
+  constructor({ jobStore, orchestrator, logger }: JobRunnerDependencies) {
     this.jobStore = jobStore;
     this.orchestrator = orchestrator;
     this.logger = logger;
   }
 
-  start(job) {
+  start(job: JobRecord): void {
     setImmediate(() => {
       this.run(job.id).catch((error) => {
-        this.logger.error('job.unhandled_failure', { jobId: job.id, error: error.message });
+        this.logger.error('job.unhandled_failure', {
+          jobId: job.id,
+          error: error instanceof Error ? error.message : 'Unknown job failure'
+        });
       });
     });
   }
 
-  async run(jobId) {
+  async run(jobId: string): Promise<void> {
     const job = await this.jobStore.markRunning(jobId);
     await this.logger.info('job.started', { jobId, type: job.type, requestId: job.requestId });
 
@@ -31,7 +51,7 @@ export class JobRunner {
         jobId,
         type: job.type,
         requestId: job.requestId,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown job failure'
       });
     }
   }

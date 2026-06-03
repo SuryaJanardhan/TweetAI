@@ -8,7 +8,7 @@ const server = app.listen(config.port, () => {
   console.log(`Tweet-AI API listening on :${config.port}`);
 });
 
-function shutdown(signal) {
+function shutdown(signal: NodeJS.Signals): void {
   // eslint-disable-next-line no-console
   console.log(`Received ${signal}; closing HTTP server`);
   server.close(() => {

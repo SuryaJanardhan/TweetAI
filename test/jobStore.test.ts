@@ -5,7 +5,7 @@ import path from 'node:path';
 import { JobStore } from '../src/jobs/JobStore.js';
 import { JobRunner } from '../src/jobs/JobRunner.js';
 
-function isolatedJobPath(name) {
+function isolatedJobPath(name: string): string {
   return path.resolve(process.cwd(), 'data', `${name}-${crypto.randomUUID()}`, 'jobs.json');
 }
 
@@ -46,7 +46,7 @@ test('JobRunner marks orchestration jobs as succeeded', async () => {
 
   const logger = { info: async () => {}, error: async () => {} };
   const orchestrator = {
-    loop: async (payload) => ({ ok: true, payload })
+    loop: async (payload: unknown) => ({ ok: true, payload })
   };
   const runner = new JobRunner({ jobStore, orchestrator, logger });
   await runner.run(job.id);

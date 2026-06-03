@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
+import type { NextFunction, Request, Response } from 'express';
+import type { AppConfig, Role } from '../types.js';
 import { forbidden, unauthorized } from '../utils/errors.js';
 
-function safeEqual(left, right) {
+function safeEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
   if (leftBuffer.length !== rightBuffer.length) {
@@ -10,8 +12,8 @@ function safeEqual(left, right) {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function authenticateApiKey(config) {
-  return (req, res, next) => {
+export function authenticateApiKey(config: AppConfig) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!config.auth.required) {
       req.user = { role: 'admin', authMode: 'disabled' };
       return next();
@@ -30,8 +32,8 @@ export function authenticateApiKey(config) {
   };
 }
 
-export function requireRole(role) {
-  return (req, _res, next) => {
+export function requireRole(role: Role) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     const userRole = req.user?.role;
     if (userRole !== role && userRole !== 'admin') {
       return next(forbidden(role));

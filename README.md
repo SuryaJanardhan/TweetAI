@@ -48,7 +48,7 @@ Primary stores:
 
 ## 4) Google Sheet Schemas
 
-Implemented in `src/sheets/schemas.js`:
+Implemented in `src/sheets/schemas.ts`:
 
 1. Trend Intelligence
 2. Actions Log
@@ -61,7 +61,7 @@ Implemented in `src/sheets/schemas.js`:
 
 ## 5) Redis Schemas
 
-Implemented in `src/redis/schemas.js`:
+Implemented in `src/redis/schemas.ts`:
 
 - Queues: action + retry queues
 - Rate limits: daily/hourly/rolling/burst keys
@@ -70,7 +70,7 @@ Implemented in `src/redis/schemas.js`:
 
 ## 6) Agent Workflows
 
-Defined in `src/agents/index.js` and orchestrated via `src/core/Orchestrator.js`:
+Defined in `src/agents/index.ts` and orchestrated via `src/core/Orchestrator.ts`:
 
 - Trend Discovery Agent
 - Community Intelligence Agent
@@ -211,9 +211,12 @@ No other agent can bypass safety because orchestrator checks safety before every
 ```bash
 npm install
 cp .env.example .env
+npm run build
 npm test
 npm start
 ```
+
+`npm start` runs the compiled TypeScript output from `dist/src/index.js`. Use `npm test` to build first and then run the compiled test suite from `dist/test`.
 
 Non-production defaults are available when `AUTH_API_KEYS` is not set:
 

@@ -1,9 +1,13 @@
+import type { AgentResult } from '../types.js';
+
 export class BaseAgent {
-  constructor(name) {
+  name: string;
+
+  constructor(name: string) {
     this.name = name;
   }
 
-  async execute(context = {}) {
+  async execute(context: unknown = {}): Promise<AgentResult> {
     return {
       agent: this.name,
       timestamp: new Date().toISOString(),

@@ -17,6 +17,7 @@ test('Orchestrator cycle writes episodic memory with decision fields', async () 
   });
 
   const result = await orchestrator.loop({ topic: 'nodejs' });
+  assert.ok('plan' in result);
   assert.equal(typeof result.plan.decision.reason, 'string');
   assert.equal(typeof result.plan.decision.confidence, 'number');
   assert.equal(typeof result.plan.decision.expectedOutcome, 'string');
@@ -33,7 +34,7 @@ test('Orchestrator rejects invalid agent output before continuing', async () => 
   const agents = buildAgents();
   agents.StrategyAgent = {
     execute: async () => ({ agent: 'StrategyAgent', timestamp: new Date().toISOString() })
-  };
+  } as never;
 
   const orchestrator = new Orchestrator({
     agents,

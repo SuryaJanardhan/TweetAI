@@ -1,6 +1,7 @@
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { buildAgents } from './agents/index.js';
+import type { AgentRegistry } from './agents/index.js';
 import { MemoryStore } from './memory/MemoryStore.js';
 import { Logger } from './utils/logger.js';
 import { Orchestrator } from './core/Orchestrator.js';
@@ -11,8 +12,20 @@ import { authenticateApiKey } from './middleware/auth.js';
 import { assignRequestContext } from './middleware/requestContext.js';
 import { JobStore } from './jobs/JobStore.js';
 import { JobRunner } from './jobs/JobRunner.js';
+import type { AppConfig, LoggerLike } from './types.js';
+import type { AppError } from './utils/errors.js';
 
-export async function createApp(options = {}) {
+interface CreateAppOptions {
+  config?: AppConfig;
+  agents?: AgentRegistry;
+  memoryStore?: MemoryStore;
+  logger?: LoggerLike;
+  orchestrator?: Orchestrator;
+  jobStore?: JobStore;
+  jobRunner?: JobRunner;
+}
+
+export async function createApp(options: CreateAppOptions = {}) {
   const config = options.config ?? loadConfig();
   const app = express();
   app.use(assignRequestContext);
@@ -30,9 +43,9 @@ export async function createApp(options = {}) {
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
   app.get('/openapi.json', (_req, res) => res.json(openApiSpec));
   app.use(authenticateApiKey(config));
-  app.use('/', createApiRouter({ orchestrator, memoryStore, agents, logger, jobStore, jobRunner }));
+  app.use('/', createApiRouter({ memoryStore, agents, logger, jobStore, jobRunner }));
 
-  app.use((error, _req, res, _next) => {
+  const errorHandler: ErrorRequestHandler = (error: AppError & { status?: number }, _req, res, _next) => {
     const statusCode = error.statusCode || error.status || 500;
     const code = error.code || 'internal_error';
     const message = statusCode >= 500 ? 'Internal server error' : error.message;
@@ -44,7 +57,8 @@ export async function createApp(options = {}) {
         ...(error.details ? { details: error.details } : {})
       }
     });
-  });
+  };
+  app.use(errorHandler);
 
   return { app, services: { agents, memoryStore, orchestrator, jobStore, jobRunner, config } };
 }

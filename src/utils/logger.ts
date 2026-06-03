@@ -1,19 +1,26 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { LoggerLike } from '../types.js';
 
-export class Logger {
-  constructor(target = path.resolve(process.cwd(), 'data', 'logs', 'events.log')) {
+type LoggerSink = 'file' | 'stdout';
+type LoggerTarget = string | { filePath?: string; sink?: LoggerSink };
+
+export class Logger implements LoggerLike {
+  filePath: string;
+  sink: LoggerSink;
+
+  constructor(target: LoggerTarget = path.resolve(process.cwd(), 'data', 'logs', 'events.log')) {
     if (typeof target === 'string') {
       this.filePath = target;
       this.sink = 'file';
       return;
     }
 
-    this.filePath = target.filePath;
+    this.filePath = target.filePath ?? path.resolve(process.cwd(), 'data', 'logs', 'events.log');
     this.sink = target.sink || 'file';
   }
 
-  async log(level, event, payload = {}) {
+  async log(level: 'info' | 'error', event: string, payload: Record<string, unknown> = {}): Promise<void> {
     const redactedPayload = redact(payload);
     const line = JSON.stringify({ timestamp: new Date().toISOString(), level, event, payload: redactedPayload });
 
@@ -27,16 +34,16 @@ export class Logger {
     await fs.appendFile(this.filePath, `${line}\n`, 'utf-8');
   }
 
-  info(event, payload = {}) {
+  info(event: string, payload: Record<string, unknown> = {}): Promise<void> {
     return this.log('info', event, payload);
   }
 
-  error(event, payload = {}) {
+  error(event: string, payload: Record<string, unknown> = {}): Promise<void> {
     return this.log('error', event, payload);
   }
 }
 
-function redact(value) {
+function redact(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(redact);
   }

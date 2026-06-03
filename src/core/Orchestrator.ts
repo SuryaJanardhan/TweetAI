@@ -1,15 +1,40 @@
 import { AppError } from '../utils/errors.js';
+import type { AgentResult, LoggerLike } from '../types.js';
+import type { AgentRegistry } from '../agents/index.js';
+import type { MemoryStore } from '../memory/MemoryStore.js';
 
-function assertAgentResult(phase, result) {
+export type OrchestrationCycle = {
+  observe: AgentResult;
+  think: AgentResult;
+  plan: AgentResult;
+  act: AgentResult;
+  reflect: AgentResult;
+  learn: AgentResult;
+};
+
+export type GuardedCycle = {
+  phase: 'guarded';
+  safety: unknown;
+  message: string;
+};
+
+interface OrchestratorDependencies {
+  agents: AgentRegistry;
+  memoryStore: MemoryStore;
+  logger: LoggerLike;
+}
+
+function assertAgentResult(phase: string, result: unknown): asserts result is AgentResult {
   if (!result || typeof result !== 'object') {
     throw new AppError(502, 'invalid_agent_output', `${phase} returned an invalid result`);
   }
 
-  if (typeof result.agent !== 'string' || typeof result.timestamp !== 'string') {
+  const candidate = result as Partial<AgentResult>;
+  if (typeof candidate.agent !== 'string' || typeof candidate.timestamp !== 'string') {
     throw new AppError(502, 'invalid_agent_output', `${phase} result is missing required metadata`);
   }
 
-  const decision = result.decision;
+  const decision = candidate.decision;
   if (
     !decision ||
     typeof decision.reason !== 'string' ||
@@ -22,13 +47,17 @@ function assertAgentResult(phase, result) {
 }
 
 export class Orchestrator {
-  constructor({ agents, memoryStore, logger }) {
+  agents: AgentRegistry;
+  memoryStore: MemoryStore;
+  logger: LoggerLike;
+
+  constructor({ agents, memoryStore, logger }: OrchestratorDependencies) {
     this.agents = agents;
     this.memoryStore = memoryStore;
     this.logger = logger;
   }
 
-  async loop(context = {}) {
+  async loop(context: unknown = {}): Promise<OrchestrationCycle | GuardedCycle> {
     if (!context || typeof context !== 'object' || Array.isArray(context)) {
       throw new AppError(400, 'invalid_context', 'Orchestration context must be a JSON object');
     }
@@ -60,7 +89,7 @@ export class Orchestrator {
 
     const cycle = { observe, think, plan, act, reflect, learn };
     await this.memoryStore.add('episodic', cycle);
-    this.logger.info('orchestrator.loop.completed', { phase: 'observe-think-plan-act-reflect-learn' });
+    await this.logger.info('orchestrator.loop.completed', { phase: 'observe-think-plan-act-reflect-learn' });
     return cycle;
   }
 }

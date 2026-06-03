@@ -1,8 +1,9 @@
+import type { NextFunction, Request, Response } from 'express';
 import { badRequest } from '../utils/errors.js';
 
 const MEMORY_TYPES = new Set(['working', 'episodic', 'semantic', 'performance', 'strategic']);
 
-export function requireMemoryType(req, _res, next) {
+export function requireMemoryType(req: Request, _res: Response, next: NextFunction): void {
   if (!MEMORY_TYPES.has(req.params.type)) {
     return next(
       badRequest('invalid_memory_type', `Unsupported memory type: ${req.params.type}`, {
@@ -13,7 +14,7 @@ export function requireMemoryType(req, _res, next) {
   return next();
 }
 
-export function requireObjectBody(req, _res, next) {
+export function requireObjectBody(req: Request, _res: Response, next: NextFunction): void {
   if (!req.is('application/json')) {
     return next(badRequest('invalid_content_type', 'Content-Type must be application/json'));
   }
@@ -25,7 +26,7 @@ export function requireObjectBody(req, _res, next) {
   return next();
 }
 
-export function requireNonEmptyObjectBody(req, res, next) {
+export function requireNonEmptyObjectBody(req: Request, res: Response, next: NextFunction): void {
   requireObjectBody(req, res, (error) => {
     if (error) {
       return next(error);
@@ -37,7 +38,7 @@ export function requireNonEmptyObjectBody(req, res, next) {
   });
 }
 
-export function optionalIdempotencyKey(req, _res, next) {
+export function optionalIdempotencyKey(req: Request, _res: Response, next: NextFunction): void {
   const value = req.header('idempotency-key');
   if (!value) {
     return next();
