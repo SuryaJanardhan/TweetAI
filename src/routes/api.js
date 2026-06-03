@@ -2,13 +2,32 @@ import express from 'express';
 import { requireRole } from '../middleware/auth.js';
 import { googleSheetSchemas } from '../sheets/schemas.js';
 import { redisSchemas } from '../redis/schemas.js';
-import { requireMemoryType, requireNonEmptyObjectBody, requireObjectBody } from '../middleware/validation.js';
+import {
+  optionalIdempotencyKey,
+  requireMemoryType,
+  requireNonEmptyObjectBody,
+  requireObjectBody
+} from '../middleware/validation.js';
 
-export function createApiRouter({ orchestrator, memoryStore, agents, logger }) {
+export function createApiRouter({ memoryStore, agents, logger, jobStore, jobRunner }) {
   const router = express.Router();
 
   router.get('/system-health', async (_req, res) => {
-    res.json({ status: 'ok', readiness: 'ready', time: new Date().toISOString() });
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  router.get('/system-readiness', async (_req, res) => {
+    const checks = {
+      memory: await memoryStore.dependencyStatus(),
+      jobs: await jobStore.dependencyStatus()
+    };
+
+    const ready = Object.values(checks).every((check) => check.status === 'ok');
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'ready' : 'not_ready',
+      checks,
+      time: new Date().toISOString()
+    });
   });
 
   router.get('/agents', (_req, res) => {
@@ -44,6 +63,15 @@ export function createApiRouter({ orchestrator, memoryStore, agents, logger }) {
 
   router.get('/actions', (_req, res) => {
     res.json({ dataSource: 'ActionsLog', safety: agents.TwitterSafetyGuardianAgent.usage });
+  });
+
+  router.get('/jobs/:id', async (req, res, next) => {
+    try {
+      const job = await jobStore.get(req.params.id);
+      res.json(job);
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get('/tweets', (_req, res) => {
@@ -86,11 +114,35 @@ export function createApiRouter({ orchestrator, memoryStore, agents, logger }) {
     }
   });
 
-  router.post('/orchestrate', requireRole('editor'), requireObjectBody, async (req, res, next) => {
+  router.post('/orchestrate', requireRole('editor'), requireObjectBody, optionalIdempotencyKey, async (req, res, next) => {
     try {
-      const cycle = await orchestrator.loop(req.body);
-      await logger.info('orchestrate.requested', { requestId: req.requestId, userRole: req.user.role });
-      res.json(cycle);
+      const { job, created } = await jobStore.create({
+        type: 'orchestration',
+        payload: req.body,
+        requestedBy: { role: req.user.role },
+        requestId: req.requestId,
+        idempotencyKey: req.idempotencyKey
+      });
+
+      if (created) {
+        jobRunner.start(job);
+      }
+
+      await logger.info('orchestrate.queued', {
+        requestId: req.requestId,
+        userRole: req.user.role,
+        jobId: job.id,
+        reused: !created
+      });
+
+      res.status(created ? 202 : 200).json({
+        jobId: job.id,
+        status: job.status,
+        idempotencyKey: job.idempotencyKey,
+        links: {
+          status: `/jobs/${job.id}`
+        }
+      });
     } catch (error) {
       next(error);
     }

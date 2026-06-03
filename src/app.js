@@ -9,6 +9,8 @@ import { openApiSpec } from './openapi.js';
 import { loadConfig } from './config.js';
 import { authenticateApiKey } from './middleware/auth.js';
 import { assignRequestContext } from './middleware/requestContext.js';
+import { JobStore } from './jobs/JobStore.js';
+import { JobRunner } from './jobs/JobRunner.js';
 
 export async function createApp(options = {}) {
   const config = options.config ?? loadConfig();
@@ -19,13 +21,16 @@ export async function createApp(options = {}) {
   const agents = options.agents ?? buildAgents();
   const memoryStore = options.memoryStore ?? new MemoryStore();
   await memoryStore.initialize();
-  const logger = options.logger ?? new Logger(config.nodeEnv === 'production' ? { sink: 'stdout' } : undefined);
+  const logger = options.logger ?? (config.nodeEnv === 'production' ? new Logger({ sink: 'stdout' }) : new Logger());
   const orchestrator = options.orchestrator ?? new Orchestrator({ agents, memoryStore, logger });
+  const jobStore = options.jobStore ?? new JobStore();
+  await jobStore.initialize();
+  const jobRunner = options.jobRunner ?? new JobRunner({ jobStore, orchestrator, logger });
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
   app.get('/openapi.json', (_req, res) => res.json(openApiSpec));
   app.use(authenticateApiKey(config));
-  app.use('/', createApiRouter({ orchestrator, memoryStore, agents, logger }));
+  app.use('/', createApiRouter({ orchestrator, memoryStore, agents, logger, jobStore, jobRunner }));
 
   app.use((error, _req, res, _next) => {
     const statusCode = error.statusCode || error.status || 500;
@@ -41,5 +46,5 @@ export async function createApp(options = {}) {
     });
   });
 
-  return { app, services: { agents, memoryStore, orchestrator, config } };
+  return { app, services: { agents, memoryStore, orchestrator, jobStore, jobRunner, config } };
 }

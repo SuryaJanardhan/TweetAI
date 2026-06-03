@@ -25,3 +25,23 @@ test('Orchestrator cycle writes episodic memory with decision fields', async () 
   const episodes = await memoryStore.get('episodic');
   assert.ok(episodes.length >= 1);
 });
+
+test('Orchestrator rejects invalid agent output before continuing', async () => {
+  const memoryStore = new MemoryStore(path.resolve(process.cwd(), 'data', 'invalid-agent-test-memory'));
+  await memoryStore.initialize();
+
+  const agents = buildAgents();
+  agents.StrategyAgent = {
+    execute: async () => ({ agent: 'StrategyAgent', timestamp: new Date().toISOString() })
+  };
+
+  const orchestrator = new Orchestrator({
+    agents,
+    memoryStore,
+    logger: new Logger(path.resolve(process.cwd(), 'data', 'invalid-agent-test-logs', 'events.log'))
+  });
+
+  await assert.rejects(() => orchestrator.loop({ topic: 'nodejs' }), {
+    code: 'invalid_agent_output'
+  });
+});

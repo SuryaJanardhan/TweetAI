@@ -23,12 +23,14 @@ export const openApiSpec = {
     },
     '/trends': { get: { summary: 'Trend intelligence feed' } },
     '/actions': { get: { summary: 'Action log view' } },
+    '/jobs/{id}': { get: { summary: 'Read background job status' } },
     '/tweets': { get: { summary: 'Tweets database view' } },
     '/analytics': { get: { summary: 'Analytics insights' } },
     '/reports': { get: { summary: 'Report schemas and metadata' } },
     '/reflection': { post: { summary: 'Store daily reflection result' } },
     '/learning': { post: { summary: 'Store learning outcome' } },
-    '/system-health': { get: { summary: 'Service health endpoint' } },
-    '/orchestrate': { post: { summary: 'Run Observe→Think→Plan→Act→Reflect→Learn cycle' } }
+    '/system-health': { get: { summary: 'Service liveness endpoint' } },
+    '/system-readiness': { get: { summary: 'Dependency readiness endpoint' } },
+    '/orchestrate': { post: { summary: 'Queue Observe→Think→Plan→Act→Reflect→Learn cycle' } }
   }
 };

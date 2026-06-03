@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createApp } from '../src/app.js';
 import { authenticateApiKey, requireRole } from '../src/middleware/auth.js';
-import { requireMemoryType, requireObjectBody } from '../src/middleware/validation.js';
+import { optionalIdempotencyKey, requireMemoryType, requireObjectBody } from '../src/middleware/validation.js';
 
 const config = {
   auth: {
@@ -14,13 +15,26 @@ const config = {
   }
 };
 
-function request({ authorization, role, body = {}, type = 'working', contentType = 'application/json' } = {}) {
+function request({
+  authorization,
+  idempotencyKey,
+  role,
+  body = {},
+  type = 'working',
+  contentType = 'application/json'
+} = {}) {
   return {
     body,
     params: { type },
     user: role ? { role } : undefined,
     header(name) {
-      return name.toLowerCase() === 'authorization' ? authorization : undefined;
+      if (name.toLowerCase() === 'authorization') {
+        return authorization;
+      }
+      if (name.toLowerCase() === 'idempotency-key') {
+        return idempotencyKey;
+      }
+      return undefined;
     },
     is(value) {
       return value === contentType;
@@ -33,6 +47,34 @@ test('authenticateApiKey rejects missing credentials', () => {
   middleware(request(), {}, (error) => {
     assert.equal(error.statusCode, 401);
     assert.equal(error.code, 'unauthorized');
+  });
+});
+
+test('createApp initializes with test configuration without binding a port', async () => {
+  const { services } = await createApp({
+    config: {
+      nodeEnv: 'test',
+      requestJsonLimit: '100kb',
+      auth: config.auth,
+      safety: { dryRun: true }
+    }
+  });
+
+  assert.equal(services.config.nodeEnv, 'test');
+  assert.ok(services.jobStore);
+  assert.ok(services.jobRunner);
+});
+
+test('validation accepts safe idempotency keys and rejects unsafe keys', () => {
+  const req = request({ idempotencyKey: 'orchestrate:topic-123' });
+  optionalIdempotencyKey(req, {}, (error) => {
+    assert.equal(error, undefined);
+    assert.equal(req.idempotencyKey, 'orchestrate:topic-123');
+  });
+
+  optionalIdempotencyKey(request({ idempotencyKey: 'bad key!' }), {}, (error) => {
+    assert.equal(error.statusCode, 400);
+    assert.equal(error.code, 'invalid_idempotency_key');
   });
 });
 

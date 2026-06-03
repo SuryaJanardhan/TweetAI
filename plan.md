@@ -364,3 +364,389 @@ The system is production ready only when:
 - It has automated tests for critical paths.
 - It supports dry-run, pause, emergency stop, and rollback.
 - It has documented runbooks for common failures.
+
+# ADVANCED AUTONOMOUS COGNITION REQUIREMENTS
+
+The system must not operate as a workflow engine.
+
+The system must operate as a cognitive system.
+
+Every agent must possess:
+
+- Objectives
+- Beliefs
+- Confidence levels
+- Uncertainty levels
+- Memory
+- Reflection capability
+- Learning capability
+- Hypothesis generation capability
+
+Agents should create hypotheses.
+
+Example:
+
+Hypothesis:
+"AI founders currently engage more with controversial technical takes than tutorials."
+
+Confidence:
+62%
+
+Evidence:
+Trend observations.
+
+The system should actively attempt to validate or invalidate hypotheses.
+
+------------------------------------------------
+
+# WORLD MODEL
+
+The platform must maintain an evolving internal representation of Twitter.
+
+The model should understand:
+
+- Communities
+- Sub-communities
+- Influencers
+- Emerging creators
+- Content clusters
+- Behavior clusters
+- Topic relationships
+- Engagement relationships
+- Influence relationships
+- Opinion relationships
+- Trend propagation pathways
+
+The system should continuously update this world model.
+
+------------------------------------------------
+
+# TWITTER GRAPH INTELLIGENCE
+
+Construct a graph.
+
+Nodes:
+
+- Users
+- Tweets
+- Topics
+- Communities
+- Keywords
+- Hashtags
+
+Edges:
+
+- Replies
+- Mentions
+- Quotes
+- Likes
+- Reposts
+- Co-occurrences
+
+Calculate:
+
+- Influence score
+- Authority score
+- Community score
+- Virality score
+- Momentum score
+- Trust score
+- Emergence score
+- Decay score
+
+------------------------------------------------
+
+# CONTENT DNA SYSTEM
+
+Every tweet must be decomposed.
+
+Analyze:
+
+- Opening style
+- Sentence length
+- Tone
+- Emotion
+- Topic
+- Call to action
+- Structure
+- Formatting
+- Hook style
+- Learning value
+- Novelty
+- Controversy
+
+Create content genetics.
+
+Identify:
+
+- Winning DNA
+- Failing DNA
+- Neutral DNA
+
+Track evolution over time.
+
+------------------------------------------------
+
+# VIRALITY RESEARCH ENGINE
+
+Reverse engineer viral tweets.
+
+Extract:
+
+- Structure
+- Topic
+- Psychology
+- Emotion
+- Timing
+- Community
+- Engagement velocity
+- Growth rate
+- Influencer interactions
+
+Discover hidden patterns.
+
+Store pattern signatures.
+
+------------------------------------------------
+
+# MEMETIC EVOLUTION SYSTEM
+
+Treat ideas as evolving organisms.
+
+Every content idea should have:
+
+- Birth
+- Growth
+- Mutation
+- Death
+
+Track:
+
+- Idea lifespan
+- Mutation success
+- Community adoption
+- Cross-community spread
+
+Generate improved descendants of successful ideas.
+
+------------------------------------------------
+
+# ATTENTION MARKET MODEL
+
+Treat Twitter as a marketplace of attention.
+
+Estimate:
+
+- Attention cost
+- Attention reward
+- Competition intensity
+- Noise level
+- Crowding score
+
+Avoid overcrowded conversations when expected value is low.
+
+------------------------------------------------
+
+# STRATEGIC THINKING ENGINE
+
+Before any action:
+
+Generate multiple strategies.
+
+Example:
+
+Strategy A:
+Reply to trend.
+
+Strategy B:
+Create original tweet.
+
+Strategy C:
+Quote influencer.
+
+Strategy D:
+Wait.
+
+Score all strategies.
+
+- Expected value
+- Risk
+- Opportunity
+- Cost
+
+Choose dynamically.
+
+------------------------------------------------
+
+# SELF CRITIC AGENT
+
+Every action must be challenged.
+
+Before execution ask:
+
+- Why is this a good idea?
+- Why might this fail?
+- Why might this appear spammy?
+- What assumptions exist?
+- What evidence supports them?
+- Should we wait?
+- Should we do nothing?
+
+The system must be capable of deciding inactivity is optimal.
+
+------------------------------------------------
+
+# ACTION ECONOMICS
+
+Every action has cost.
+
+- Like Cost
+- Reply Cost
+- Quote Cost
+- Tweet Cost
+- Follow Cost
+- Reputation Cost
+- Rate Limit Cost
+- Opportunity Cost
+
+Track all costs.
+
+Use expected value calculations.
+
+------------------------------------------------
+
+# REPUTATION MODEL
+
+Maintain internal reputation scores.
+
+- Platform Reputation
+- Community Reputation
+- Influencer Reputation
+- Topic Reputation
+- Content Reputation
+- Action Reputation
+
+Protect reputation aggressively.
+
+------------------------------------------------
+
+# SOCIAL PSYCHOLOGY ENGINE
+
+Analyze:
+
+- Curiosity
+- Status
+- Fear
+- Trust
+- Humor
+- Identity
+- Belonging
+- Controversy
+- Novelty
+- Authority
+
+Detect which psychological triggers drive engagement.
+
+------------------------------------------------
+
+# EMERGENT COMMUNITY DETECTION
+
+Automatically discover:
+
+- New communities
+- New trends
+- New influencers
+- New topic clusters
+
+Without predefined categories.
+
+Use clustering algorithms.
+
+Allow communities to emerge naturally.
+
+------------------------------------------------
+
+# DECISION MEMORY
+
+Store every decision.
+
+Fields:
+
+- Situation
+- Decision
+- Alternatives considered
+- Reasoning
+- Confidence
+- Outcome
+- Lesson
+- Future recommendation
+
+Create institutional memory.
+
+------------------------------------------------
+
+# AUTONOMOUS RESEARCH AGENT
+
+Continuously ask:
+
+- What do we not know?
+- What assumptions are weak?
+- What communities are underexplored?
+- What opportunities remain undiscovered?
+
+Generate research tasks automatically.
+
+------------------------------------------------
+
+# META LEARNING SYSTEM
+
+Track:
+
+- Which strategies learn fastest
+- Which agents learn fastest
+- Which memory sources are most useful
+- Which decisions consistently outperform
+
+Optimize the learning process itself.
+
+------------------------------------------------
+
+# BEHAVIORAL DRIFT DETECTION
+
+Detect when:
+
+- Engagement drops
+- Communities shift
+- Topics evolve
+- Strategies stop working
+
+Automatically adapt.
+
+------------------------------------------------
+
+# LONG TERM STRATEGIC PLANNING
+
+Maintain:
+
+- Daily goals
+- Weekly goals
+- Monthly goals
+- Quarterly goals
+
+Align all agent actions with long-term objectives.
+
+------------------------------------------------
+
+# AUTONOMOUS EXECUTIVE AGENT
+
+Highest-level agent.
+
+Responsibilities:
+
+- Observe entire system
+- Resolve agent conflicts
+- Allocate resources
+- Prioritize goals
+- Approve major strategy changes
+
+Acts as the CEO of all agents.

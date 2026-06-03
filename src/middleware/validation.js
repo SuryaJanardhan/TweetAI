@@ -36,3 +36,22 @@ export function requireNonEmptyObjectBody(req, res, next) {
     return next();
   });
 }
+
+export function optionalIdempotencyKey(req, _res, next) {
+  const value = req.header('idempotency-key');
+  if (!value) {
+    return next();
+  }
+
+  if (!/^[A-Za-z0-9._:-]{8,128}$/.test(value)) {
+    return next(
+      badRequest(
+        'invalid_idempotency_key',
+        'Idempotency-Key must be 8-128 characters and contain only letters, numbers, dot, underscore, colon, or dash'
+      )
+    );
+  }
+
+  req.idempotencyKey = value;
+  return next();
+}

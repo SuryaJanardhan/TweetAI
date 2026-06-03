@@ -46,4 +46,13 @@ export class MemoryStore {
     const needle = query.toLowerCase();
     return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(needle));
   }
+
+  async dependencyStatus() {
+    try {
+      await Promise.all(MEMORY_TYPES.map((type) => fs.access(this.pathFor(type))));
+      return { status: 'ok' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
 }
