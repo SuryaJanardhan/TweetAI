@@ -201,7 +201,7 @@ No other agent can bypass safety because orchestrator checks safety before every
 
 ## Security and Reliability Notes
 
-- Role-based access middleware implemented (`x-role`)
+- API-key authentication with role-based authorization
 - Structured audit/event logging included
 - Safety guardian pre-check prevents over-limit actions
 - Memory store supports fallback file persistence
@@ -210,6 +210,15 @@ No other agent can bypass safety because orchestrator checks safety before every
 
 ```bash
 npm install
+cp .env.example .env
 npm test
 npm start
 ```
+
+Non-production defaults are available when `AUTH_API_KEYS` is not set:
+
+- `dev-viewer-token`
+- `dev-editor-token`
+- `dev-admin-token`
+
+Use `Authorization: Bearer <token>` for API requests. Production requires explicit `AUTH_API_KEYS` in `token:role` format.

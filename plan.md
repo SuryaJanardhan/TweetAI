@@ -1,660 +1,366 @@
-# TWEET-AI: Autonomous Twitter AI Orchestration Platform
+# Production-Grade Development Plan
 
-## Mission
+This plan turns the current Tweet-AI backend scaffold into a reliable production service. It prioritizes correctness, safety, observability, and deployability before scale or advanced AI features.
 
-Build a production-grade autonomous Twitter/X AI orchestration platform called "Tweet-AI".
+## Current State
 
-The system must behave like a highly intelligent human social media manager rather than a traditional bot.
+- Node.js 20+ Express backend with REST routes and Swagger docs.
+- Agent orchestration loop using observe, think, plan, act, reflect, learn phases.
+- Safety guardian that blocks actions above 80% of configured Twitter/X limits.
+- File-backed memory store and structured file logger.
+- Basic role middleware using `x-role`.
+- Focused tests for orchestration and safety behavior.
 
-The platform should:
+## Production Principles
 
-* Observe Twitter/X continuously
-* Understand trends
-* Understand communities
-* Understand sentiment
-* Learn from mistakes
-* Maintain memory
-* Create and adapt strategies
-* Make autonomous decisions
-* Perform actions safely
-* Generate reports
-* Improve over time
+- Safety is a hard dependency, not a best-effort feature.
+- External actions must be idempotent, auditable, rate-limited, and retry-safe.
+- All user input, API payloads, agent outputs, and third-party responses must be validated.
+- Runtime behavior must be observable through logs, metrics, traces, alerts, and health checks.
+- Secrets, credentials, tokens, and account state must never be committed or logged.
+- The API process should remain stateless; durable state belongs in managed stores.
+- Every risky behavior needs tests before rollout.
 
-The entire backend must be built in Node.js.
+## Phase 1: Production Blockers
 
-Primary Storage:
+### 1. Configuration and Secrets
 
-* Google Sheets
-* Redis (optional free tier)
-* File-based memory if needed
+Tasks:
 
-Architecture:
+- Add a typed configuration module that reads environment variables once at startup.
+- Validate required variables with clear startup errors.
+- Separate local, test, staging, and production configuration.
+- Add `.env.example` with safe placeholder values.
+- Ensure logs never include API keys, access tokens, cookies, auth headers, or raw private prompts.
 
-* Multi-Agent AI System
-* Context-Aware
-* Goal-Oriented
-* Self-Reflective
-* Autonomous Decision Making
+Acceptance criteria:
 
----
+- App fails fast when required production configuration is missing.
+- Tests can run with isolated test configuration.
+- No secrets appear in logs, responses, or committed files.
 
-# CRITICAL REQUIREMENTS
+### 2. Real Authentication and Authorization
 
-The system must NEVER appear as a bot.
+Tasks:
 
-The system should:
+- Replace `x-role` trust with real authentication.
+- Use JWT, session auth, or API keys depending on deployment needs.
+- Add role and permission checks for all write or action endpoints.
+- Add audit logs for authenticated user, route, operation, and decision.
+- Rate-limit authentication failures.
 
-* Mimic realistic human behavior
-* Avoid repetitive actions
-* Avoid predictable schedules
-* Avoid fixed intervals
-* Avoid robotic posting patterns
-* Avoid spam-like behavior
+Acceptance criteria:
 
-Every action must feel naturally human.
+- Anonymous users cannot mutate memory, trigger orchestration, or execute actions.
+- Authorization tests cover viewer, editor, admin, invalid token, and missing token cases.
+- Audit logs identify who triggered each high-risk operation.
 
-The system should make decisions based on:
+### 3. Request and Response Validation
 
-* Context
-* Trends
-* Memory
-* Historical performance
-* Community behavior
-* Engagement patterns
+Tasks:
 
----
+- Add schema validation for all route params, query params, and request bodies.
+- Validate agent outputs before passing them to the next orchestration phase.
+- Return consistent error envelopes.
+- Add request size limits.
+- Reject unknown memory types and unsupported action types before orchestration.
 
-# TWITTER SAFETY LAYER
+Acceptance criteria:
 
-Design a dedicated Twitter Safety Guardian Agent.
+- Invalid payloads return `400` with stable machine-readable errors.
+- Agent output contract failures are logged and stop unsafe execution.
+- Tests cover malformed bodies, invalid memory types, and invalid orchestration payloads.
 
-This agent has higher authority than all other agents.
+### 4. Durable Persistence
 
-Responsibilities:
+Tasks:
 
-* Track all Twitter limits
-* Track all action frequencies
-* Track all engagement frequencies
-* Track all posting frequencies
-* Track all API consumption
+- Keep file storage only for local development and tests.
+- Add production adapters for durable storage:
+  - Redis for distributed rate limits, queues, locks, and short-lived cache.
+  - Postgres or another durable database for actions, memory, users, accounts, audits, and job state.
+  - Google Sheets only for reporting/export, not as the source of truth.
+- Add migrations and schema ownership.
+- Add optimistic concurrency or locking for writes that affect limits and action state.
 
-Rule:
+Acceptance criteria:
 
-The platform must always remain at least 20% below every Twitter threshold.
+- Multiple API/worker instances can run without corrupting state.
+- Memory, action history, safety counters, and audits survive process restarts.
+- Tests verify storage adapter contracts.
 
-Example:
+### 5. Reliable Safety Guardian
 
-If Twitter allows 100 actions:
+Tasks:
 
-Maximum allowed by system:
+- Move safety counters from process memory to Redis or durable shared storage.
+- Implement per-account and per-action-class limits.
+- Track daily, hourly, rolling 15-minute, and burst windows using real expiry.
+- Add account suspension, manual pause, emergency stop, and maintenance mode.
+- Require safety approval immediately before every external Twitter/X action.
+- Record every allow/block decision with the triggering context.
 
-80 actions
+Acceptance criteria:
 
-Never exceed.
+- Safety limits work across multiple processes.
+- Counters reset according to actual time windows.
+- Blocked actions are queued or rejected consistently.
+- Tests cover boundary conditions, concurrent checks, resets, and emergency stop.
 
-Must support:
+## Phase 2: Reliable Execution
 
-* Daily limits
-* Hourly limits
-* Rolling windows
-* Burst protection
-* Cooldown periods
+### 6. Queue-Based Orchestration
 
-Safety Agent can:
+Tasks:
 
-* Delay actions
-* Cancel actions
-* Queue actions
-* Modify plans
+- Split API requests from background workers.
+- Add a job queue for orchestration cycles and external actions.
+- Store job status: queued, running, succeeded, failed, canceled, delayed.
+- Add idempotency keys for action jobs.
+- Add retry policies with exponential backoff and dead-letter queues.
+- Add cancellation and pause controls per account.
 
-No other agent may override this agent.
+Acceptance criteria:
 
----
+- API returns quickly with a job id for long-running work.
+- Duplicate requests do not create duplicate external actions.
+- Failed jobs are visible, retryable, and auditable.
 
-# HIGH LEVEL AGENT ARCHITECTURE
+### 7. Twitter/X Integration
 
-Create autonomous agents.
+Tasks:
 
-## 1. Trend Discovery Agent
+- Build a dedicated Twitter/X client module.
+- Centralize auth, retries, timeout handling, rate-limit headers, and error mapping.
+- Use least-privilege permissions.
+- Support dry-run mode for staging.
+- Store external IDs for every created tweet, reply, like, repost, or follow.
+- Reconcile local action state with Twitter/X responses.
 
-Responsibilities:
+Acceptance criteria:
 
-* Monitor global trends
-* Monitor regional trends
-* Monitor niche trends
+- No route or agent calls Twitter/X directly.
+- All external calls pass through safety, idempotency, logging, and error handling.
+- Integration tests can run against mocked Twitter/X responses.
 
-Examples:
+### 8. Orchestrator Hardening
 
-AI
-JavaScript
-Node.js
-Cybersecurity
-Finance
-Sports
-Gaming
+Tasks:
 
-Outputs:
+- Make each phase explicit and independently testable.
+- Add timeouts for agent execution.
+- Add circuit breakers for failing agents or integrations.
+- Persist intermediate phase outputs for resume and debugging.
+- Add deterministic run ids and correlation ids.
+- Add policy checks before plan and before act.
 
-* Trend score
-* Momentum score
-* Growth score
-* Saturation score
-* Opportunity score
+Acceptance criteria:
 
-Store all findings.
+- A failed phase does not lose the full cycle context.
+- Cycles can be inspected by run id.
+- Timeouts and partial failures produce stable, actionable error states.
 
----
+### 9. Observability
 
-## 2. Community Intelligence Agent
+Tasks:
 
-Responsibilities:
+- Replace file-only logging with structured logs to stdout in production.
+- Add request ids and correlation ids.
+- Add metrics:
+  - request rate, latency, and error rate
+  - orchestration success/failure counts
+  - queue depth and job latency
+  - safety allow/block counts
+  - external API rate-limit usage
+  - token and model cost
+- Add health endpoints:
+  - liveness
+  - readiness
+  - dependency checks
+- Add alerts for safety bypass attempts, high failure rate, queue backlog, and auth failures.
 
-Analyze:
+Acceptance criteria:
 
-* Communities
-* Influencers
-* Discussions
-* Popular accounts
+- Operators can answer what happened, when, why, and who triggered it.
+- Readiness fails when required dependencies are unavailable.
+- Alerts exist for conditions that threaten safety or availability.
 
-Detect:
+## Phase 3: Quality and Maintainability
 
-* Interests
-* Pain points
-* Questions
-* Complaints
-* Opportunities
+### 10. Testing Strategy
 
----
+Tasks:
 
-## 3. Conversation Understanding Agent
+- Add unit tests for config, auth, validation, safety, storage adapters, and agent contracts.
+- Add route tests using an HTTP test client.
+- Add integration tests for queue, Redis, and database adapters.
+- Add contract tests for Twitter/X client behavior.
+- Add regression tests for every discovered production incident.
+- Add coverage thresholds for critical modules.
 
-Responsibilities:
+Acceptance criteria:
 
-Read:
+- `npm test` runs reliably on a clean checkout.
+- Critical safety and action paths have high confidence coverage.
+- CI blocks merges when tests fail.
 
-* Tweets
-* Replies
-* Threads
+### 11. Code Quality
 
-Understand:
+Tasks:
 
-* Context
-* Sentiment
-* Intent
+- Add ESLint and Prettier or another consistent formatter/linter setup.
+- Add `npm run lint`, `npm run format:check`, and `npm run test:ci`.
+- Add dependency auditing in CI.
+- Add clear module boundaries:
+  - routes only handle HTTP
+  - services coordinate use cases
+  - clients handle external APIs
+  - repositories handle persistence
+  - agents handle domain reasoning
+- Add ADRs for major architecture choices.
 
-Classify:
+Acceptance criteria:
 
-Question
-Discussion
-Debate
-News
-Complaint
-Tutorial
-Announcement
+- CI enforces tests, linting, formatting, and dependency checks.
+- New features follow the same structure without route-level business logic.
 
----
+### 12. API Design
 
-## 4. Memory Agent
+Tasks:
 
-Long-term memory.
+- Version the API under `/v1`.
+- Keep OpenAPI in sync with real route behavior.
+- Add pagination for list endpoints.
+- Add stable error codes.
+- Add response schemas for every route.
+- Add request examples for common workflows.
 
-Stores:
+Acceptance criteria:
 
-* Successful actions
-* Failed actions
-* Viral tweets
-* Bad decisions
-* Community preferences
-* Posting history
+- Generated OpenAPI docs accurately match implemented routes.
+- Clients can handle errors programmatically.
+- Large responses are paginated.
 
-Memory Types:
+## Phase 4: Deployment and Operations
 
-Short-term Memory
-Working Memory
-Long-term Memory
+### 13. Containerization
 
-Must support:
+Tasks:
 
-* Retrieval
-* Similarity search
-* Reflection
+- Add a production Dockerfile using a non-root user.
+- Add `.dockerignore`.
+- Add graceful shutdown handling for HTTP server and workers.
+- Add startup checks for config and dependency readiness.
+- Pin Node version.
 
----
+Acceptance criteria:
 
-## 5. Strategy Agent
+- Container starts, serves health checks, and shuts down cleanly.
+- No development-only files or secrets are included in the image.
 
-Creates plans.
+### 14. CI/CD
 
-Example:
+Tasks:
 
-"AI coding discussions currently rising."
+- Add a CI pipeline for install, lint, test, build, audit, and container build.
+- Add staging deployment before production.
+- Require manual approval for production rollout.
+- Add rollback procedure.
+- Add migration checks before deployment.
 
-Plan:
+Acceptance criteria:
 
-* Engage with 5 discussions
-* Create 2 original tweets
-* Reply to 3 influencers
+- Every change is tested before merge.
+- Production deploys are repeatable and reversible.
 
-All plans generated dynamically.
+### 15. Runtime Operations
 
----
+Tasks:
 
-## 6. Content Agent
+- Create runbooks for:
+  - safety shutdown
+  - Twitter/X API outage
+  - queue backlog
+  - database failure
+  - leaked credential rotation
+  - bad agent behavior
+- Add backup and restore procedures.
+- Add retention policies for logs, audits, and memory.
+- Add operational dashboards.
 
-Generates:
+Acceptance criteria:
 
-* Tweets
-* Threads
-* Replies
-* Quotes
+- On-call operators can respond without reading source code first.
+- Backups are tested through restore drills.
 
-Must adapt tone.
+## Phase 5: AI and Product Maturity
 
-Examples:
+### 16. Model and Prompt Governance
 
-Professional
-Technical
-Funny
-Educational
-Casual
+Tasks:
 
----
+- Store prompt versions and model choices.
+- Log model inputs and outputs with redaction.
+- Add evaluation datasets for strategy, content quality, and safety compliance.
+- Add human approval gates for high-risk actions.
+- Track token usage and cost per account.
 
-## 7. Human Behavior Agent
+Acceptance criteria:
 
-Simulates realistic usage.
+- Prompt or model changes are measurable and reversible.
+- Unsafe or low-confidence actions require human review.
 
-Randomizes:
+### 17. Learning System
 
-* Active hours
-* Response delays
-* Reading time
-* Session length
+Tasks:
 
-Avoids:
+- Separate raw events, derived insights, and long-term memory.
+- Add quality scores to reflections and learned outcomes.
+- Prevent low-quality or unsafe outputs from entering strategic memory.
+- Add memory pruning, deduplication, and retention.
+- Add retrieval tests for representative workflows.
 
-* Mechanical behavior
-* Perfect timing
-* Repetitive posting
+Acceptance criteria:
 
----
+- Memory improves decisions without accumulating untrusted noise.
+- Learned behavior can be explained and audited.
 
-## 8. Engagement Agent
+### 18. Analytics and Reporting
 
-Can:
+Tasks:
 
-* Like tweets
-* Reply
-* Quote repost
-* Repost
+- Build analytics from durable action and outcome data.
+- Export curated reporting views to Google Sheets.
+- Track content performance, engagement quality, safety blocks, and growth trends.
+- Add account-level and campaign-level reporting.
 
-Decision based.
+Acceptance criteria:
 
-Not scripted.
+- Reports are reproducible from source-of-truth data.
+- Reporting failures do not block safety or execution.
 
----
+## Recommended Near-Term Implementation Order
 
-## 9. Reflection Agent
+1. Add config validation and `.env.example`.
+2. Add request validation and consistent error responses.
+3. Add real auth and authorization tests.
+4. Move safety counters to Redis-backed storage.
+5. Add queue-based orchestration and idempotency.
+6. Add durable database schema for actions, audits, jobs, memory, users, and accounts.
+7. Build the Twitter/X client behind dry-run mode.
+8. Add production logging, metrics, readiness checks, and alerts.
+9. Containerize and add CI gates.
+10. Run a staged rollout with human approval before live actions.
 
-Every day:
+## Definition of Production Ready
 
-Review:
+The system is production ready only when:
 
-* What worked
-* What failed
-* Why
-
-Generate lessons.
-
-Store lessons.
-
----
-
-## 10. Learning Agent
-
-Uses reflections.
-
-Updates:
-
-* Strategies
-* Content styles
-* Engagement preferences
-
-Must continuously evolve.
-
----
-
-# AUTONOMOUS DECISION ENGINE
-
-System must not rely on fixed prompts.
-
-Instead:
-
-Observe → Think → Plan → Act → Reflect → Learn
-
-Loop continuously.
-
-Agents communicate through shared memory.
-
-Every decision must include:
-
-Reason
-Confidence
-Expected Outcome
-Risk Score
-
-Store all decisions.
-
----
-
-# MEMORY SYSTEM
-
-Build memory hierarchy.
-
-## Working Memory
-
-Current session.
-
-## Episodic Memory
-
-Past events.
-
-## Semantic Memory
-
-Facts learned.
-
-## Performance Memory
-
-Analytics.
-
-## Strategic Memory
-
-Winning patterns.
-
-All searchable.
-
----
-
-# GOOGLE SHEETS DATABASE DESIGN
-
-Create beautiful structured sheets.
-
-## Sheet 1
-
-Trend Intelligence
-
-Columns:
-
-Date
-Trend
-Category
-Growth
-Momentum
-Region
-Opportunity Score
-
----
-
-## Sheet 2
-
-Actions Log
-
-Date
-Action
-Target
-Reason
-Outcome
-Confidence
-
----
-
-## Sheet 3
-
-Tweets Database
-
-Tweet ID
-Content
-Category
-Engagement
-Likes
-Replies
-Reposts
-
----
-
-## Sheet 4
-
-Learning Memory
-
-Date
-Observation
-Lesson
-Impact
-
----
-
-## Sheet 5
-
-Competitor Analysis
-
-Account
-Followers
-Content Type
-Engagement Rate
-Growth
-
----
-
-## Sheet 6
-
-Weekly Insights
-
-Pattern
-Evidence
-Confidence
-Recommendation
-
----
-
-## Sheet 7
-
-Viral Analysis
-
-Tweet
-Reach
-Engagement
-Topic
-Structure
-Reason
-
----
-
-## Sheet 8
-
-Failure Analysis
-
-Failure
-Cause
-Lesson
-Future Prevention
-
----
-
-# ANALYTICS ENGINE
-
-Must generate advanced marketing insights.
-
-Examples:
-
-Why posts succeeded
-
-Why posts failed
-
-Best posting styles
-
-Best engagement styles
-
-Best topic categories
-
-Best communities
-
-Best content structures
-
-Best thread lengths
-
-Best sentiment
-
-Best tone
-
-Best hashtags
-
-Best times
-
-All automatically discovered.
-
----
-
-# VISUAL DASHBOARD DATA
-
-Generate data for:
-
-* Line Charts
-* Trend Graphs
-* Growth Graphs
-* Heatmaps
-* Funnel Analysis
-* Engagement Curves
-* Category Analysis
-
-Google Sheets must support visualization directly.
-
----
-
-# LLM STRATEGY
-
-Use SLMs whenever possible.
-
-Examples:
-
-Small local models
-Fast models
-Cheap models
-
-Escalate to larger models only when:
-
-* Deep reasoning needed
-* Reflection needed
-* Strategy needed
-
-Reduce cost.
-
----
-
-# REDIS USAGE
-
-Use Redis for:
-
-* Queues
-* Action scheduling
-* Memory cache
-* Rate-limit tracking
-* Agent communication
-
----
-
-# REST API DESIGN
-
-Node.js REST API.
-
-Modules:
-
-/agents
-/memory
-/trends
-/actions
-/tweets
-/analytics
-/reports
-/reflection
-/learning
-/system-health
-
-All APIs documented.
-
-Swagger required.
-
----
-
-# OBSERVABILITY
-
-Track:
-
-Agent decisions
-Memory access
-Failures
-Errors
-Action execution
-Learning outcomes
-
-Store everything.
-
----
-
-# FAILURE RECOVERY
-
-System must recover from:
-
-Twitter outages
-Rate-limit hits
-Redis failures
-Google Sheet failures
-LLM failures
-
-Automatic retry mechanisms.
-
-Circuit breakers.
-
-Fallback modes.
-
----
-
-# SECURITY
-
-Encrypted secrets.
-
-Role-based access.
-
-Audit logs.
-
-API key rotation.
-
-Environment-based configs.
-
----
-
-# OUTPUT EXPECTATION
-
-Generate:
-
-1. Complete architecture diagram
-2. Folder structure
-3. Database design
-4. Google Sheet schemas
-5. Redis schemas
-6. Agent workflows
-7. Agent communication protocol
-8. REST API design
-9. Scheduler architecture
-10. Memory architecture
-11. Reflection architecture
-12. Learning architecture
-13. Analytics architecture
-14. Full Node.js implementation plan
-15. Production deployment plan
-16. Scaling strategy
-17. Cost optimization strategy
-18. Monitoring strategy
-19. Safety strategy
-20. Step-by-step development roadmap
-
-Provide enterprise-grade design with detailed explanations and implementation guidance for every component.
+- It can run multiple instances safely.
+- It cannot execute external actions without authentication, authorization, safety approval, and audit logging.
+- It survives process restarts without losing state.
+- It validates all external input and agent output.
+- It exposes health, metrics, logs, and alerts.
+- It has automated tests for critical paths.
+- It supports dry-run, pause, emergency stop, and rollback.
+- It has documented runbooks for common failures.

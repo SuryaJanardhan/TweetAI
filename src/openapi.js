@@ -5,6 +5,16 @@ export const openApiSpec = {
     version: '1.0.0',
     description: 'Autonomous Twitter AI orchestration platform API'
   },
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'API key passed as a Bearer token'
+      }
+    }
+  },
+  security: [{ bearerAuth: [] }],
   paths: {
     '/agents': { get: { summary: 'List agents' } },
     '/memory/{type}': {
