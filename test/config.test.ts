@@ -14,7 +14,12 @@ test('loadConfig parses API keys and port', () => {
     NODE_ENV: 'production',
     PORT: '8080',
     AUTH_API_KEYS: 'viewer-token:viewer,admin-token:admin',
-    DRY_RUN: 'false'
+    DRY_RUN: 'false',
+    GEMINI_API_KEY: 'dummy-gemini-key',
+    TWITTER_API_KEY: 'dummy-twitter-key',
+    TWITTER_API_SECRET: 'dummy-twitter-secret',
+    TWITTER_ACCESS_TOKEN: 'dummy-twitter-token',
+    TWITTER_ACCESS_SECRET: 'dummy-twitter-access-secret'
   });
 
   assert.equal(config.port, 8080);

@@ -19,6 +19,14 @@ export interface AppConfig {
   safety: {
     dryRun: boolean;
   };
+  geminiApiKey?: string;
+  groqApiKey?: string;
+  twitter?: {
+    apiKey: string;
+    apiSecret: string;
+    accessToken: string;
+    accessSecret: string;
+  };
 }
 
 export interface AgentDecision {

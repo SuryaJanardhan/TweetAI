@@ -61,6 +61,16 @@ function parseApiKeys(value: string | undefined, nodeEnv: string): ApiKeyConfig[
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const nodeEnv = env.NODE_ENV || 'development';
+  
+  const twitterConfig = env.TWITTER_API_KEY || env.TWITTER_API_SECRET || env.TWITTER_ACCESS_TOKEN || env.TWITTER_ACCESS_SECRET
+    ? {
+        apiKey: env.TWITTER_API_KEY || '',
+        apiSecret: env.TWITTER_API_SECRET || '',
+        accessToken: env.TWITTER_ACCESS_TOKEN || '',
+        accessSecret: env.TWITTER_ACCESS_SECRET || ''
+      }
+    : undefined;
+
   const config: AppConfig = {
     nodeEnv,
     port: parsePort(env.PORT),
@@ -71,11 +81,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     safety: {
       dryRun: parseBoolean(env.DRY_RUN, nodeEnv !== 'production')
-    }
+    },
+    geminiApiKey: env.GEMINI_API_KEY,
+    groqApiKey: env.GROQ_API_KEY,
+    twitter: twitterConfig
   };
 
   if (!config.auth.required && nodeEnv === 'production') {
     throw new Error('AUTH_REQUIRED cannot be false in production');
+  }
+
+  if (nodeEnv === 'production') {
+    if (!config.geminiApiKey && !config.groqApiKey) {
+      throw new Error('At least one of GEMINI_API_KEY or GROQ_API_KEY must be configured in production');
+    }
+    if (!config.safety.dryRun) {
+      if (
+        !config.twitter?.apiKey ||
+        !config.twitter?.apiSecret ||
+        !config.twitter?.accessToken ||
+        !config.twitter?.accessSecret
+      ) {
+        throw new Error(
+          'All TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_SECRET must be configured in production when DRY_RUN is false'
+        );
+      }
+    }
   }
 
   return config;

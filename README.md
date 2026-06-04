@@ -13,10 +13,10 @@ flowchart TD
   REFLECT --> LEARN[Learn]
   LEARN --> OBS
 
-  SAFETY[Twitter Safety Guardian Agent\n(higher authority)] --> PLAN
+  SAFETY["Twitter Safety Guardian Agent\n(higher authority)"] --> PLAN
   SAFETY --> ACT
 
-  MEM[Memory Hierarchy\nworking/episodic/semantic/performance/strategic] <--> OBS
+  MEM["Memory Hierarchy\nworking/episodic/semantic/performance/strategic"] <--> OBS
   MEM <--> THINK
   MEM <--> PLAN
   MEM <--> REFLECT
