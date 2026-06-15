@@ -27,6 +27,8 @@ export interface AppConfig {
     accessToken: string;
     accessSecret: string;
   };
+  databaseUrl?: string;
+  redisUrl?: string;
 }
 
 export interface AgentDecision {

@@ -19,7 +19,9 @@ test('loadConfig parses API keys and port', () => {
     TWITTER_API_KEY: 'dummy-twitter-key',
     TWITTER_API_SECRET: 'dummy-twitter-secret',
     TWITTER_ACCESS_TOKEN: 'dummy-twitter-token',
-    TWITTER_ACCESS_SECRET: 'dummy-twitter-access-secret'
+    TWITTER_ACCESS_SECRET: 'dummy-twitter-access-secret',
+    DATABASE_URL: 'postgresql://localhost/dummy',
+    REDIS_URL: 'redis://localhost/dummy'
   });
 
   assert.equal(config.port, 8080);

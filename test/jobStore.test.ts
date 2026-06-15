@@ -1,13 +1,22 @@
-import test from 'node:test';
+import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { JobStore } from '../src/jobs/JobStore.js';
 import { JobRunner } from '../src/jobs/JobRunner.js';
+import { cleanupTestStorage, closeTestConnections } from '../src/utils/testHelpers.js';
 
 function isolatedJobPath(name: string): string {
   return path.resolve(process.cwd(), 'data', `${name}-${crypto.randomUUID()}`, 'jobs.json');
 }
+
+beforeEach(async () => {
+  await cleanupTestStorage();
+});
+
+after(async () => {
+  await closeTestConnections();
+});
 
 test('JobStore reuses existing jobs for the same idempotency key', async () => {
   const jobStore = new JobStore(isolatedJobPath('job-store-test'));
@@ -54,4 +63,6 @@ test('JobRunner marks orchestration jobs as succeeded', async () => {
   const stored = await jobStore.get(job.id);
   assert.equal(stored.status, 'succeeded');
   assert.deepEqual(stored.result, { ok: true, payload: { topic: 'nodejs' } });
+
+  await runner.shutdown();
 });

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import type { NextFunction, Request, Response } from 'express';
 import { createApp } from '../src/app.js';
@@ -56,7 +56,17 @@ function request({
   } as unknown as Request;
 }
 
+import { cleanupTestStorage, closeTestConnections } from '../src/utils/testHelpers.js';
+
 const response = {} as Response;
+
+beforeEach(async () => {
+  await cleanupTestStorage();
+});
+
+after(async () => {
+  await closeTestConnections();
+});
 
 test('authenticateApiKey rejects missing credentials', () => {
   const middleware = authenticateApiKey(config);
@@ -80,6 +90,8 @@ test('createApp initializes with test configuration without binding a port', asy
   assert.equal(services.config.nodeEnv, 'test');
   assert.ok(services.jobStore);
   assert.ok(services.jobRunner);
+
+  await services.jobRunner.shutdown();
 });
 
 test('validation accepts safe idempotency keys and rejects unsafe keys', () => {

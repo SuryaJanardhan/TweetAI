@@ -1,4 +1,30 @@
 import type { ApiKeyConfig, AppConfig, Role } from './types.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Parse .env manually if it exists
+try {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const index = trimmed.indexOf('=');
+      if (index !== -1) {
+        const key = trimmed.slice(0, index).trim();
+        const value = trimmed.slice(index + 1).trim();
+        // Remove surrounding quotes if present
+        const cleanedValue = value.replace(/^(['"])(.*)\1$/, '$2');
+        if (!(key in process.env)) {
+          process.env[key] = cleanedValue;
+        }
+      }
+    }
+  }
+} catch (err) {
+  // Ignore filesystem errors
+}
 
 const VALID_ROLES = new Set<Role>(['viewer', 'editor', 'admin']);
 const DEFAULT_NON_PRODUCTION_KEYS: ApiKeyConfig[] = [
@@ -84,7 +110,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     geminiApiKey: env.GEMINI_API_KEY,
     groqApiKey: env.GROQ_API_KEY,
-    twitter: twitterConfig
+    twitter: twitterConfig,
+    databaseUrl: env.DATABASE_URL,
+    redisUrl: env.REDIS_URL
   };
 
   if (!config.auth.required && nodeEnv === 'production') {
@@ -92,6 +120,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   if (nodeEnv === 'production') {
+    if (!config.databaseUrl) {
+      throw new Error('DATABASE_URL must be configured in production');
+    }
+    if (!config.redisUrl) {
+      throw new Error('REDIS_URL must be configured in production');
+    }
     if (!config.geminiApiKey && !config.groqApiKey) {
       throw new Error('At least one of GEMINI_API_KEY or GROQ_API_KEY must be configured in production');
     }

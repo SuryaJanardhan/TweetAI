@@ -15,6 +15,8 @@ import { JobRunner } from './jobs/JobRunner.js';
 import type { AppConfig, LoggerLike } from './types.js';
 import type { AppError } from './utils/errors.js';
 
+import { runMigrations } from './db/migrate.js';
+
 interface CreateAppOptions {
   config?: AppConfig;
   agents?: AgentRegistry;
@@ -30,6 +32,9 @@ export async function createApp(options: CreateAppOptions = {}) {
   const app = express();
   app.use(assignRequestContext);
   app.use(express.json({ limit: config.requestJsonLimit }));
+
+  // Run database migrations
+  await runMigrations();
 
   const agents = options.agents ?? buildAgents();
   const memoryStore = options.memoryStore ?? new MemoryStore();

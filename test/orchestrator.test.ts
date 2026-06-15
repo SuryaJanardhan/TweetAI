@@ -1,10 +1,19 @@
-import test from 'node:test';
+import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAgents } from '../src/agents/index.js';
 import { Orchestrator } from '../src/core/Orchestrator.js';
 import { MemoryStore } from '../src/memory/MemoryStore.js';
 import { Logger } from '../src/utils/logger.js';
 import path from 'node:path';
+import { cleanupTestStorage, closeTestConnections } from '../src/utils/testHelpers.js';
+
+beforeEach(async () => {
+  await cleanupTestStorage();
+});
+
+after(async () => {
+  await closeTestConnections();
+});
 
 test('Orchestrator cycle writes episodic memory with decision fields', async () => {
   const memoryStore = new MemoryStore(path.resolve(process.cwd(), 'data', 'test-memory'));

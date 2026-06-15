@@ -62,7 +62,7 @@ export class Orchestrator {
       throw new AppError(400, 'invalid_context', 'Orchestration context must be a JSON object');
     }
 
-    const safety = this.agents.TwitterSafetyGuardianAgent.canExecute(1);
+    const safety = await this.agents.TwitterSafetyGuardianAgent.canExecute(1);
     if (!safety.allowed) {
       await this.logger.info('orchestrator.loop.blocked', { safety });
       return {
@@ -85,7 +85,7 @@ export class Orchestrator {
     const learn = await this.agents.LearningAgent.execute({ reflect, context });
     assertAgentResult('learn', learn);
 
-    this.agents.TwitterSafetyGuardianAgent.trackAction(1);
+    await this.agents.TwitterSafetyGuardianAgent.trackAction(1);
 
     const cycle = { observe, think, plan, act, reflect, learn };
     await this.memoryStore.add('episodic', cycle);

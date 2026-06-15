@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { query, isDbConnected } from '../db/index.js';
 
 const MEMORY_TYPES = ['working', 'episodic', 'semantic', 'performance', 'strategic'] as const;
 export type MemoryType = (typeof MEMORY_TYPES)[number];
@@ -14,6 +15,9 @@ export class MemoryStore {
   }
 
   async initialize(): Promise<void> {
+    if (isDbConnected()) {
+      return;
+    }
     await fs.mkdir(this.basePath, { recursive: true });
     await Promise.all(
       MEMORY_TYPES.map(async (type) => {
@@ -35,6 +39,15 @@ export class MemoryStore {
   }
 
   async add(type: string, entry: MemoryRecord): Promise<MemoryRecord> {
+    if (isDbConnected()) {
+      const timestampedEntry = { ...entry, timestamp: new Date().toISOString() };
+      const res = await query(
+        'INSERT INTO memory (type, entry) VALUES ($1, $2) RETURNING entry',
+        [type, JSON.stringify(timestampedEntry)]
+      );
+      return res.rows[0].entry as MemoryRecord;
+    }
+
     const records = await this.get(type);
     const next = [...records, { ...entry, timestamp: new Date().toISOString() }];
     await fs.writeFile(this.pathFor(type), JSON.stringify(next, null, 2));
@@ -42,17 +55,40 @@ export class MemoryStore {
   }
 
   async get(type: string): Promise<MemoryRecord[]> {
+    if (isDbConnected()) {
+      const res = await query('SELECT entry FROM memory WHERE type = $1 ORDER BY id ASC', [type]);
+      return res.rows.map((row) => row.entry as MemoryRecord);
+    }
+
     const text = await fs.readFile(this.pathFor(type), 'utf-8');
     return JSON.parse(text) as MemoryRecord[];
   }
 
-  async similaritySearch(type: string, query: string): Promise<MemoryRecord[]> {
+  async similaritySearch(type: string, queryText: string): Promise<MemoryRecord[]> {
+    if (isDbConnected()) {
+      const needle = `%${queryText.toLowerCase()}%`;
+      const res = await query(
+        'SELECT entry FROM memory WHERE type = $1 AND LOWER(entry::text) LIKE $2 ORDER BY id ASC',
+        [type, needle]
+      );
+      return res.rows.map((row) => row.entry as MemoryRecord);
+    }
+
     const rows = await this.get(type);
-    const needle = query.toLowerCase();
+    const needle = queryText.toLowerCase();
     return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(needle));
   }
 
   async dependencyStatus(): Promise<DependencyStatus> {
+    if (isDbConnected()) {
+      try {
+        await query('SELECT 1');
+        return { status: 'ok' };
+      } catch (error) {
+        return { status: 'error', message: error instanceof Error ? error.message : 'Database query test failed' };
+      }
+    }
+
     try {
       await Promise.all(MEMORY_TYPES.map((type) => fs.access(this.pathFor(type))));
       return { status: 'ok' };
